@@ -4,6 +4,7 @@ library(dplyr)
 library(gridExtra)
 library(alluvial)
 library(extrafont)
+library(magrittr)
 
 d1=read.table("data/student-mat.csv",sep=",",header=TRUE)
 d2=read.table("data/student-por.csv",sep=",",header=TRUE)
@@ -17,7 +18,9 @@ d3norepeats<-d3 %>% distinct(school,sex,age,address,famsize,Pstatus,
 alc_data = d3norepeats[ ,c('Dalc', 'Walc')]
 
 #Kmeans
-fit <- kmeans(alc_data, 2)
+C1<-c(0,0)
+C2<-c(5,5)
+fit <- kmeans(alc_data, centers = rbind(C1, C2))
 aggregate(alc_data,by=list(fit$cluster),FUN=mean)
 alc_kmeans_data <- data.frame(d3norepeats, fit$cluster)
 
@@ -54,8 +57,12 @@ grid.arrange(str2,nrow=2)
 alc_kmeans_data$sex <- as.factor(alc_kmeans_data$sex)
 
 library(rpart)
+install.packages('rpart.plot')
 library(rpart.plot)
-classification <- rpart(fit$cluster ~ school + sex + age + address + famsize + Pstatus + 
+classification <- rpart(alc_heirar_data$pijak ~ school + sex + age + address + famsize + Pstatus +
+                          Medu+Fedu+Mjob+Fjob+reason+
+                        guardian+traveltime+studytime+failures+
+                        schoolsup+ famsup+activities+nursery+higher+internet+
               romantic + famrel + freetime + goout +  health + absences,
              method="class", data=alc_kmeans_data)
 
