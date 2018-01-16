@@ -5,7 +5,12 @@ library(gridExtra)
 library(alluvial)
 library(extrafont)
 library(magrittr)
+library(fpc)
+library(cluster) 
+library(rpart)
+library(rpart.plot)
 
+#Przygotowanie danych
 d1=read.table("data/student-mat.csv",sep=",",header=TRUE)
 d2=read.table("data/student-por.csv",sep=",",header=TRUE)
 d3<-rbind(d1,d2) 
@@ -17,59 +22,64 @@ d3norepeats<-d3 %>% distinct(school,sex,age,address,famsize,Pstatus,
 
 alc_data = d3norepeats[ ,c('Dalc', 'Walc')]
 
+#######################################
+# Klasyfikatory (wybór 1 z nich)#
+######################################
+
 #Kmeans
 C1<-c(0,0)
 C2<-c(5,5)
 fit <- kmeans(alc_data, centers = rbind(C1, C2))
 aggregate(alc_data,by=list(fit$cluster),FUN=mean)
-alc_kmeans_data <- data.frame(d3norepeats, fit$cluster)
+fit <- fit$cluster
 
-library(cluster) 
-clusplot(alc_data, fit$cluster, color=TRUE, shade=TRUE, labels=2, lines=0)
+#hierarchiczne
+d <- dist(alc_data, method = "euclidean")
+tree <- hclust(d, method="complete") 
+plot(tree) # 
+fit <- cutree(tree, k=2)
+rect.hclust(tree, k=2, border="red")
 
-str2=ggplot(alc_data, aes(x=Dalc, y=Walc)) + 
-  geom_point(aes(colour=factor(fit$cluster)))+ scale_colour_hue(l=25,c=150)
+# Połączenie danych
+alc_clustered_data <- data.frame(d3norepeats, fit)
+
+#######################################
+# Wykres klasyfikaotra #
+######################################
+clusplot(alc_data, fit, color=TRUE, shade=TRUE, labels=2, lines=0)
+plotcluster(alc_data, fit) 
+str2=ggplot(alc_clustered_data, aes(x=Dalc, y=Walc)) + 
+  geom_point(aes(colour=factor(fit)))+ scale_colour_hue(l=25,c=150)
 grid.arrange(str2,nrow=2)
 
-#hierarchiczne (rozne metody)
-# Ward Hierarchical Clustering
-d <- dist(alc_data, method = "euclidean") # distance matrix
-fit <- hclust(d, method="complete") 
-plot(fit) # display dendogram
-pijak <- cutree(fit, k=2) # cut tree into 5 clusters
-# draw dendogram with red borders around the 5 clusters 
-rect.hclust(fit, k=2, border="red")
 
-alc_heirar_data <- data.frame(d3norepeats, pijak)
-
-str2=ggplot(alc_heirar_data, aes(x=Dalc, y=Walc)) + 
-  geom_point(aes(colour=factor(pijak)))+ scale_colour_hue(l=25,c=150)
-grid.arrange(str2,nrow=2)
+#######################################
+# Statysyki klasyfikaotra #
+######################################
+Dist <- dist(alc_data,method="manhattan")
+km_stats <- cluster.stats(Dist, fit)
+km_stats
 
 
 #####################################
-# KLASYFIKACJA DŻEWEM #
+# KLASYFIKACJA DRZEWEM #
 ######################################
 
-#zmapować na liczby
-#fir cluster na dyskretna
+set.seed(120) # 
+sample <- sample.int(n = nrow(alc_heirar_data), size = floor(.75*nrow(alc_heirar_data)), replace = F)
+train <- alc_clustered_data[sample, ]
+test  <- alc_clustered_data[-sample, ]
 
-alc_kmeans_data$sex <- as.factor(alc_kmeans_data$sex)
-
-library(rpart)
-install.packages('rpart.plot')
-library(rpart.plot)
-classification <- rpart(alc_heirar_data$pijak ~ school + sex + age + address + famsize + Pstatus +
+classification <- rpart(train$fit ~ school + sex + age + address + famsize + Pstatus +
                           Medu+Fedu+Mjob+Fjob+reason+
                         guardian+traveltime+studytime+failures+
                         schoolsup+ famsup+activities+nursery+higher+internet+
               romantic + famrel + freetime + goout +  health + absences,
-             method="class", data=alc_kmeans_data)
+             method="class", data=train)
 
 rpart.plot(classification)
 
-printcp(classification) # display the results 
-plotcp(classification) # visualize cross-validation results 
-plot(classification, uniform=TRUE, 
-     main="Classification Tree for Kyphosis")
-text(classification, use.n=TRUE, all=TRUE, cex=.8)
+printcp(classification)
+pred <- predict(classification, newdata = test, type="class") 
+table(pred, test$fit)
+
