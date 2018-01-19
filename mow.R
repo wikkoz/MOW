@@ -25,60 +25,86 @@ d3norepeats<-d3 %>% distinct(school,sex,age,address,famsize,Pstatus,
 alc_data = d3norepeats[ ,c('Dalc', 'Walc')]
 
 #######################################
-# Klasyfikatory (wybór 1 z nich)#
+# Grupowanie (wybór 1 z nich)#
 ######################################
 
+#########Wybór centrum
 
 C1<-c(0,0)
 C2<-c(5,5)
-fit <- kmeans(alc_data, centers = rbind(C1, C2))
+C3<-c(3,2)
+C4<-c(2,3)
+dist_euclidean <- dist(alc_data,method="euclidean")
+dist_manhattan <- dist(alc_data,method="manhattan")
 
-###ladny wykres
-fviz_cluster(fit, alc_data, geom = "point", palette = "Set2", ggtheme = theme_minimal())
+experiment_kmeans <- function(fit, iskmeans=TRUE) {
+  f = fit$cluster
+  km_stats_euclidean <- cluster.stats(dist_euclidean, f)
+  km_stats_manhattan <- cluster.stats(dist_manhattan, f)
+  cat("Euclidean: Average between: ", km_stats_euclidean$average.between, " Average within: ",
+      km_stats_euclidean$average.within, " Siluetthe: ", km_stats_euclidean$avg.silwidth, " Dunn: ", 
+      km_stats_euclidean$dunn, "\n")
+  cat("Manhattan: Average between: ", km_stats_manhattan$average.between, " Average within: ",
+      km_stats_manhattan$average.within, " Siluetthe: ", km_stats_manhattan$avg.silwidth, " Dunn: ", 
+      km_stats_manhattan$dunn, "\n")
+  return(fviz_cluster(fit, alc_data, geom = "point", palette = "Set2", ggtheme = theme_minimal()))
+}
 
-##sil
-sil <- silhouette(fit$cluster, dist(alc_data))
-fviz_silhouette(sil)
+experiment_hclust <- function(method, metric) {
+  hcut <- hcut(alc_data, k = 2, hc_method=method, hc_metric=metric)
+  km_stats_euclidean <- cluster.stats(dist_euclidean, hcut$cluster)
+  km_stats_manhattan <- cluster.stats(dist_manhattan, hcut$cluster)
+  cat("Euclidean: Average between: ", km_stats_euclidean$average.between, " Average within: ",
+      km_stats_euclidean$average.within, " Siluetthe: ", km_stats_euclidean$avg.silwidth, " Dunn: ", 
+      km_stats_euclidean$dunn, "\n")
+  cat("Manhattan: Average between: ", km_stats_manhattan$average.between, " Average within: ",
+      km_stats_manhattan$average.within, " Siluetthe: ", km_stats_manhattan$avg.silwidth, " Dunn: ", 
+      km_stats_manhattan$dunn, "\n")
+  
+  return(hcut)
+}
 
+#######################################
+# Grupowanie - kmeans #
+######################################
 
-aggregate(alc_data,by=list(fit$cluster),FUN=mean)
-fit <- fit$cluster
+experiment_kmeans(kmeans(alc_data, centers = 2, nstart = 5))
+experiment_kmeans(kmeans(alc_data, centers = rbind(C1, C2)))
+experiment_kmeans(kmeans(alc_data, centers = rbind(C3, C4)))
+experiment_kmeans(kmeans(alc_data, iter.max=100, centers = rbind(C1, C2)))
+experiment_kmeans(kmeans(alc_data, iter.max=5, centers = rbind(C1, C2)))
+experiment_kmeans(kmeans(alc_data, iter.max=100, algorithm = "Lloyd", centers = rbind(C1, C2)))
+experiment_kmeans(kmeans(alc_data, iter.max=100, algorithm = "MacQueen", centers = 2))
 
-#hierarchiczne
-d <- dist(alc_data, method = "euclidean")
-tree <- hclust(d, method="complete") 
-plot(tree) # 
-fit <- cutree(tree, k=2)
+#######################################
+# Grupowanie - hierarchicczne #
+######################################
 
-hcut <- hcut(alc_data, k = 2, method="complete")
+hcut <- experiment_hclust("complete", "euclidian")
+fviz_dend(hcut, show_labels = FALSE)
+fviz_cluster(hcut, geom = "point", palette = "Set2", ggtheme = theme_minimal())
 
+hcut <- experiment_hclust("ward.D", "euclidian")
+fviz_dend(hcut, show_labels = FALSE)
+fviz_cluster(hcut, geom = "point", palette = "Set2", ggtheme = theme_minimal())
 
-rect.hclust(tree, k=2, border="red")
+hcut <- experiment_hclust("ward.D2", "euclidian")
+fviz_dend(hcut, show_labels = FALSE)
+fviz_cluster(hcut, geom = "point", palette = "Set2", ggtheme = theme_minimal())
+
+hcut <- experiment_hclust("average", "euclidian")
+fviz_dend(hcut, show_labels = FALSE)
 fviz_cluster(hcut, geom = "point", palette = "Set2", ggtheme = theme_minimal())
 
 
 
+#####################################
+# NAJLEPSZE GRUPOWANIE #
+######################################
 
+fit <- kmeans(alc_data, centers = rbind(C1, C2))
 # Połączenie danych
 alc_clustered_data <- data.frame(d3norepeats, fit)
-
-#######################################
-# Wykres klasyfikaotra #
-######################################
-clusplot(alc_data, fit, color=TRUE, shade=TRUE, labels=2, lines=0)
-plotcluster(alc_data, fit) 
-str2=ggplot(alc_clustered_data, aes(x=Dalc, y=Walc)) + 
-  geom_point(aes(colour=factor(fit)))+ scale_colour_hue(l=25,c=150)
-grid.arrange(str2,nrow=2)
-
-
-#######################################
-# Statysyki klasyfikaotra #
-######################################
-Dist <- dist(alc_data,method="manhattan")
-km_stats <- cluster.stats(Dist, fit)
-km_stats
-
 
 #####################################
 # KLASYFIKACJA DRZEWEM #
