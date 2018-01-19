@@ -9,6 +9,8 @@ library(fpc)
 library(cluster) 
 library(rpart)
 library(rpart.plot)
+library(factoextra)
+
 
 #Przygotowanie danych
 d1=read.table("data/student-mat.csv",sep=",",header=TRUE)
@@ -26,10 +28,19 @@ alc_data = d3norepeats[ ,c('Dalc', 'Walc')]
 # Klasyfikatory (wybór 1 z nich)#
 ######################################
 
-#Kmeans
+
 C1<-c(0,0)
 C2<-c(5,5)
 fit <- kmeans(alc_data, centers = rbind(C1, C2))
+
+###ladny wykres
+fviz_cluster(fit, alc_data, geom = "point", palette = "Set2", ggtheme = theme_minimal())
+
+##sil
+sil <- silhouette(fit$cluster, dist(alc_data))
+fviz_silhouette(sil)
+
+
 aggregate(alc_data,by=list(fit$cluster),FUN=mean)
 fit <- fit$cluster
 
@@ -38,7 +49,15 @@ d <- dist(alc_data, method = "euclidean")
 tree <- hclust(d, method="complete") 
 plot(tree) # 
 fit <- cutree(tree, k=2)
+
+hcut <- hcut(alc_data, k = 2, method="complete")
+
+
 rect.hclust(tree, k=2, border="red")
+fviz_cluster(hcut, geom = "point", palette = "Set2", ggtheme = theme_minimal())
+
+
+
 
 # Połączenie danych
 alc_clustered_data <- data.frame(d3norepeats, fit)
