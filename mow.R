@@ -11,7 +11,6 @@ library(rpart)
 library(rpart.plot)
 library(factoextra)
 
-
 #Przygotowanie danych
 d1=read.table("data/student-mat.csv",sep=",",header=TRUE)
 d2=read.table("data/student-por.csv",sep=",",header=TRUE)
@@ -111,20 +110,31 @@ alc_clustered_data <- data.frame(d3norepeats, fit)
 ######################################
 
 set.seed(120) # 
-sample <- sample.int(n = nrow(alc_heirar_data), size = floor(.75*nrow(alc_heirar_data)), replace = F)
+sample <- sample.int(n = nrow(alc_clustered_data), size = floor(.75*nrow(alc_clustered_data)), replace = F)
 train <- alc_clustered_data[sample, ]
 test  <- alc_clustered_data[-sample, ]
 
-classification <- rpart(train$fit ~ school + sex + age + address + famsize + Pstatus +
-                          Medu+Fedu+Mjob+Fjob+reason+
-                        guardian+traveltime+studytime+failures+
-                        schoolsup+ famsup+activities+nursery+higher+internet+
-              romantic + famrel + freetime + goout +  health + absences,
-             method="class", data=train)
+experiment_cassification <- function (control) {
+  classification <- rpart(train$fit ~ school + age + address + famsize + Pstatus +
+                            Medu+Fedu+Mjob+Fjob+reason+
+                            guardian+traveltime+studytime+failures+
+                            schoolsup+ famsup+activities+nursery+higher+internet+
+                            romantic + goout + sex,
+                          method="class", data=train, control = control)
+  
+  rpart.plot(classification)
+  
+  printcp(classification)
+  pred <- predict(classification, newdata = test, type="class") 
+  tab <- table(pred, test$fit)
+  (tab[1,1] + tab[2,2] )/ (tab[1,1] + tab[2,2] + tab[1,2] + tab[1,2]) *100 
+}
 
-rpart.plot(classification)
+experiment_cassification(rpart.control(minsplit = 1, cp = 0.01, xval = 10, maxdepth = 30))
+experiment_cassification(rpart.control(minsplit = 20, cp = 0.001, xval = 10, maxdepth = 30))
+experiment_cassification(rpart.control(minsplit = 10, cp = 0.001, xval = 10, maxdepth = 30))
+experiment_cassification(rpart.control(minsplit = 20, cp = 0.01, xval = 10, maxdepth = 30))
+experiment_cassification(rpart.control(minsplit = 20, cp = 0.01, xval = 10, maxdepth = 30))
 
-printcp(classification)
-pred <- predict(classification, newdata = test, type="class") 
-table(pred, test$fit)
+
 
